@@ -51,13 +51,13 @@ except (ImportError, ValueError, Exception):
 
 # ── Configuration ────────────────────────────────────────────────────────────
 
-API_KEY = "AQ.Ab8RN6LCZNVoEuePOYV7Cg4S956XjUU5uabyw5UIwC49oshXww"
-MODEL   = "gemini-2.5-flash"
+API_KEY = "AIzaSyCe53bXDqN7FeJQcH9kEcLuTYuCko_Z0g8"
+MODEL   = "gemini-2.0-flash"
 PROMPT  = (
-    "You are an expert assistant. Look at this screenshot carefully. "
-    "Identify the question being asked and all answer options visible. "
+    "Look at this screenshot. "
+    "Find the question and answer options. "
     "Return ONLY the correct answer (e.g. 'A', 'B', 'C', 'D', or exact text). "
-    "If free-form, answer in under 50 words. No explanation. Just the answer."
+    "If free-form, answer in under 30 words. No explanation."
 )
 
 SA_DIR_PATH  = os.path.dirname(os.path.abspath(__file__))
@@ -302,28 +302,30 @@ def query_gemini(image_path):
         ]}],
         "generationConfig": {
             "temperature": 0.05, "topK": 32,
-            "topP": 0.85, "maxOutputTokens": 512
+            "topP": 0.85, "maxOutputTokens": 256
         }
     }).encode()
 
     def attempt():
         req = urllib.request.Request(url, data=body,
             headers={"Content-Type": "application/json"})
-        resp = urllib.request.urlopen(req, timeout=15)
+        resp = urllib.request.urlopen(req, timeout=20)
         data = json.loads(resp.read())
         parts = data['candidates'][0]['content']['parts']
         return "".join(p.get("text", "") for p in parts).strip()
 
-    try:
-        return attempt()
-    except urllib.error.HTTPError as e:
-        if e.code == 429:
-            import time; time.sleep(4)
-            try:    return attempt()
-            except: return "Rate limited"
-        return f"API error ({e.code})"
-    except Exception as e:
-        return f"Error: {e}"
+    import time
+    for retry in range(3):
+        try:
+            return attempt()
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                time.sleep(2 * (retry + 1) ** 2)
+                continue
+            return f"API error ({e.code})"
+        except Exception as e:
+            return f"Error: {e}"
+    return "Rate limited — try again shortly"
 
 # ── GTK3 Overlay ──────────────────────────────────────────────────────────────
 
